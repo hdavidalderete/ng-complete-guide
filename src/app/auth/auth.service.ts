@@ -18,8 +18,9 @@ export interface AuthResponseData {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   user = new BehaviorSubject<User>(null);
+  private tokenExpirationTimer: any;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   signup(email: string, password: string) {
     return this.http
@@ -49,8 +50,8 @@ export class AuthService {
       .post<AuthResponseData>(
         'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyB5nXg8aCHtU9494lUyX2YDaTWmahk5jpY',
         {
-          email: email,
-          password: password,
+          email,
+          password,
           returnSecureToken: true
         }
       )
@@ -67,6 +68,42 @@ export class AuthService {
       );
   }
 
+  autoLogin() {
+    const userData: {
+      email: string;
+      id: string;
+      _token: string;
+      _tokenExpirationDate: string;
+    } = JSON.parse(localStorage.getItem('userData'));
+    if (!userData) {
+      return;
+    } else {
+      const userLoader = new User(userData.email, userData.id, userData._token, new Date(userData._tokenExpirationDate));
+      if (userLoader.token) {
+        this.user.next(userLoader);
+        const expiratioDuration = new Date(userData._tokenExpirationDate).getTime() - new Date().getTime();
+        this.autoLogout(expiratioDuration);
+      }
+    }
+  }
+
+  logout() {
+    this.user.next(null);
+    localStorage.removeItem('userData');
+    if (this.tokenExpirationTimer) {
+      clearTimeout(this.tokenExpirationTimer);
+    }
+    this.tokenExpirationTimer = null;
+  }
+
+  autoLogout(expiratioDuration: number) {
+    this.tokenExpirationTimer = setTimeout( () => {
+      this.logout();
+    },
+      expiratioDuration
+    );
+  }
+
   private handleAuthentication(
     email: string,
     userId: string,
@@ -76,6 +113,10 @@ export class AuthService {
     const expirationDate = new Date(new Date().getTime() + expiresIn * 1000);
     const user = new User(email, userId, token, expirationDate);
     this.user.next(user);
+    // almacenamos la info del user en nuestro local storage para no perderla al recargar
+    localStorage.setItem('userData', JSON.stringify(user));
+    // Cerrar sesion cuando se termine el tiempo del token
+    this.autoLogout(expiresIn * 1000);
   }
 
   private handleError(errorRes: HttpErrorResponse) {

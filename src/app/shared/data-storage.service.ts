@@ -24,28 +24,19 @@ export class DataStorageService {
 
   fetchRecipes() {
     // usamos pipe para alterar la respuesta de la subscripcion
-    // take para que entre una sola vez o tome un solo valor y luego hace un unsubscribe automaticamente
-    // exaustMap espera que termine el primer observable y llamar al siguiente
-    return this.authService.user.pipe(
-      take(1),
-    exhaustMap( user => {
-        return this.http.get<Recipe[]>(
-        'https://ng-course-recipe-book-73dc8.firebaseio.com/recipes.json',
-        {
-          params: new HttpParams().set('auth', user.token)
-        });
-      }),
-      map(recipes => {
-        return recipes.map(recipe => {
-          return {
-            ...recipe,
-            ingredients: recipe.ingredients ? recipe.ingredients : []
-          };
-        });
-      }),
-      tap(recipes => {
-        this.recipeService.setRecipes(recipes);
-      })
-    );
+    return this.http.get<Recipe[]>(
+      'https://ng-course-recipe-book-73dc8.firebaseio.com/recipes.json').pipe(
+        map(recipes => {
+          return recipes.map(recipe => {
+            return {
+              ...recipe,
+              ingredients: recipe.ingredients ? recipe.ingredients : []
+            };
+          });
+        }),
+        tap(recipes => {
+          this.recipeService.setRecipes(recipes);
+        })
+      );
   }
 }
